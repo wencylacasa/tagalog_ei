@@ -3,7 +3,7 @@ header('Content-Type: application/json');
 
 // Read the incoming Google Chat message
 $input = json_decode(file_get_contents('php://input'), true);
-$userText = $input['message']['text'] ?? 'bumibira kaba ng saba';
+$userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
 // Function to call Gemini 2.5 Flash with SWATTER MODE
