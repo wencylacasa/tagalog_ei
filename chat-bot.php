@@ -73,7 +73,7 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    echo $response;
+   
     // Better error handling
     if ($httpCode !== 200) {
         error_log("Gemini API Error: $response");
