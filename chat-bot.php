@@ -31,6 +31,13 @@ if ($jsonError !== JSON_ERROR_NONE) {
 
 error_log("Parsed type: " . ($input['type'] ?? 'NULL'));
 
+// PING endpoint to keep server warm
+if ($_SERVER['REQUEST_URI'] === '/ping') {
+    error_log("PING received - server is warm");
+    echo json_encode(['status' => 'alive', 'time' => date('Y-m-d H:i:s')]);
+    exit;
+}
+
 // Step 5: Handle events
 try {
     // ADDED_TO_SPACE
