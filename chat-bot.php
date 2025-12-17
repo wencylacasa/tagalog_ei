@@ -7,7 +7,7 @@ $userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
 // Call Groq
-$replyText = callGroq($input);
+$replyText = $input;
 
 // Wrap response for Google Chat 2nd-gen (Cloud Functions)
 $response = [
