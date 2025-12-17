@@ -49,7 +49,11 @@ function callGemini($prompt) {
 - PAG EASTER EGG (Sando/Preprod) = MAS BRUTAL PA, WALANG AWAT
 
 **TONE:** Parang kausap mo yung tropa na walang modo, walang filter, walang pakialam sa feelings. Pure kanto vibes, swatter energy. Pag Sando o Preprod, MAS SAVAGE PA.
- walang English.";
+ walang English.
+ 
+ 
+ eto and sabi ng mga kausap mo : $prompt
+ ";
 
     $payload = [
         "contents" => [[
