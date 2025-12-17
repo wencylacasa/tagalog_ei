@@ -1,32 +1,39 @@
 <?php
+// Ensure NO spaces or lines exist above the <?php tag
 ob_start(); 
+
+// 1. Set Headers
 header('Content-Type: application/json; charset=UTF-8');
 
-error_reporting(E_ALL);
+// 2. Silence Errors (They break JSON)
+error_reporting(0); 
 ini_set('display_errors', 0);
 
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true);
+// 3. Get Input
+$input = json_decode(file_get_contents('php://input'), true);
 
-if (!$input) {
-    ob_end_clean();
-    echo json_encode(['text' => 'No input received']);
-    exit;
+if (isset($input['type'])) {
+    $userText = $input['message']['text'] ?? 'Hi!';
+    // Clean @mention
+    $cleanText = trim(preg_replace('/@[^\s]+/', '', $userText));
+    
+    // 4. The strict "Just Text" format for Add-on configured Apps
+    $response = [
+        "text" => "Echo: " . $cleanText,
+        "actionResponse" => [
+            "type" => "NEW_MESSAGE"
+        ]
+    ];
+} else {
+    $response = ["text" => "Service is running."];
 }
 
-// Extract message
-$userText = $input['message']['text'] ?? 'Hello';
-$cleanText = trim(preg_replace('/@[^\s]+/', '', $userText));
+// 5. Final Output Safety
+$output = json_encode($response);
 
-// The absolute simplest valid response for a Chat App
-$response = [
-    "text" => "Echo: " . $cleanText,
-    "actionResponse" => [
-        "type" => "NEW_MESSAGE"
-    ]
-];
-
-$jsonOutput = json_encode($response);
+// Clear any accidental output (notices, spaces, etc.)
 ob_end_clean(); 
-echo $jsonOutput;
+
+// Send exactly the JSON and nothing else
+echo $output;
 exit;
