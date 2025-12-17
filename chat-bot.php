@@ -3,80 +3,39 @@ header('Content-Type: application/json');
 
 // Read raw input
 $rawInput = file_get_contents('php://input');
-$event = json_decode($rawInput, true);
+$input = json_decode($rawInput, true);
 
-// Log for debugging (remove in production)
-error_log("Received event: " . print_r($event, true));
+// Debug: Log what we receive (remove in production)
+// error_log("Raw input: " . $rawInput);
 
-// Extract user message and sender info from Google Chat event
+// Handle different Google Chat formats
 $userText = '';
 $senderName = 'User';
 
-// Google Chat sends different event types
-$eventType = $event['type'] ?? '';
-
-switch ($eventType) {
-    case 'MESSAGE':
-        // Regular message event
-        $userText = $event['message']['text'] ?? '';
-        
-        // Remove bot mention from text (e.g., "@BotName hello" -> "hello")
-        if (isset($event['message']['argumentText'])) {
-            $userText = $event['message']['argumentText'];
-        }
-        
-        $senderName = $event['message']['sender']['displayName'] ?? 
-                      $event['user']['displayName'] ?? 'User';
-        break;
-        
-    case 'ADDED_TO_SPACE':
-        // Bot was added to a space
-        if (isset($event['space']['type']) && $event['space']['type'] === 'DM') {
-            $userText = 'ADDED_TO_DM';
-        } else {
-            $userText = 'ADDED_TO_SPACE';
-        }
-        $senderName = $event['user']['displayName'] ?? 'User';
-        break;
-        
-    case 'REMOVED_FROM_SPACE':
-        // Bot was removed (usually you won't respond to this)
-        exit;
-        
-    case 'CARD_CLICKED':
-        // Handle card interactions
-        $userText = $event['action']['actionMethodName'] ?? 'CARD_CLICKED';
-        $senderName = $event['user']['displayName'] ?? 'User';
-        break;
-        
-    default:
-        // Fallback: try to extract text from common locations
-        $userText = $event['message']['text'] ?? 
-                    $event['message']['argumentText'] ?? 
-                    $event['text'] ?? '';
-        $senderName = $event['message']['sender']['displayName'] ?? 
-                      $event['user']['displayName'] ?? 'User';
+// Try different possible structures
+if (isset($input['message']['text'])) {
+    // Direct webhook format
+    $userText = $input['message']['text'];
+    $senderName = $input['message']['sender']['displayName'] ?? 'User';
+} elseif (isset($input['text'])) {
+    // Simplified format
+    $userText = $input['text'];
+    $senderName = $input['sender']['displayName'] ?? 'User';
+} elseif (isset($input['message']['argumentText'])) {
+    // Slash command format
+    $userText = $input['message']['argumentText'];
+    $senderName = $input['message']['sender']['displayName'] ?? 'User';
+} elseif (isset($input['type']) && $input['type'] === 'MESSAGE') {
+    // Apps Script format with type field
+    $userText = $input['message']['text'] ?? $input['message']['argumentText'] ?? '';
+    $senderName = $input['user']['displayName'] ?? 'User';
 }
 
-// Validate we got a message
+// Fallback: if still empty, return error response
 if (empty($userText)) {
-   
-    // Return response in multiple formats for compatibility
-    $response1 = [
-        "text" => $rawInput,
-        // Also include the Cloud Functions format
-        "hostAppDataAction" => [
-            "chatDataAction" => [
-                "createMessageAction" => [
-                    "message" => [
-                        "text" => $rawInput
-                    ]
-                ]
-            ]
-        ]
-    ];
-
-    echo json_encode($response1);
+    echo json_encode([
+        "text" => "Tangina pre, walang makita akong message! Ano ba sinend mo? Debug info: " . substr($rawInput, 0, 200)
+    ]);
     exit;
 }
 
@@ -159,16 +118,23 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     return 'Pasensya, may error sa response. Check kung may safety filter.';
 }
 
-// Handle special cases
-if ($eventType === 'ADDED_TO_SPACE') {
-    $replyText = "Yawa! Nandito na ako mga PHP programmers! Handa na ba kayong malait ng todo?! Tangina niyo!";
-} else {
-    // Call Gemini for normal messages
-    $replyText = callGemini($userText);
-}
+// Call Gemini
+$replyText = callGemini($userText);
 
-// Return response in Google Chat format
-echo json_encode([
-    "text" => $replyText
-]);
+// Return response in multiple formats for compatibility
+$response = [
+    "text" => $replyText,
+    // Also include the Cloud Functions format
+    "hostAppDataAction" => [
+        "chatDataAction" => [
+            "createMessageAction" => [
+                "message" => [
+                    "text" => $replyText
+                ]
+            ]
+        ]
+    ]
+];
+
+echo json_encode($response);
 ?>
