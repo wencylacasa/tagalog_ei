@@ -8,7 +8,7 @@ $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
 // Function to call Gemini 2.5 Flash with SWATTER MODE
 function callGemini($prompt) {
-    $apiKey = 'AIzaSyCZ0BFk1m0axKLyd_ZUBaFD62Wxdl7BBYQ'; // <-- your key
+    $apiKey = 'AIzaSyCNps-O9_4WRQ3OPFP9L_zgiW8urna221M'; // <-- your key
     
     // ⬇️ USING: Gemini 2.5 Flash (newest model)
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-001:generateContent?key=$apiKey";
