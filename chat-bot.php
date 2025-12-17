@@ -70,14 +70,14 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-
+    echo $response ;
     if ($httpCode !== 200) {
         return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
 
-
+    echo $httpCode;
     $data = json_decode($response, true);
-
+    echo $data;
     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
