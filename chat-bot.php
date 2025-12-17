@@ -3,15 +3,17 @@ header('Content-Type: application/json');
 
 // Read the incoming Google Chat message
 $input = json_decode(file_get_contents('php://input'), true);
-$userText = $input['message']['text'] ?? 'test lang to bay';
+$userText = $input['message']['text'] ?? 'testing bobo';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
-// Function to call Gemini Flash 2.5 with EXTRA ASAR Bisaya Roast Mode
+// Function to call Gemini with SWATTER MODE
 function callGemini($prompt) {
     $apiKey = 'AIzaSyCZ0BFk1m0axKLyd_ZUBaFD62Wxdl7BBYQ'; // <-- your key
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=$apiKey";
+    
+    // ⬇️ CHANGED: Use gemini-1.5-flash instead (more stable, higher quota)
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey";
 
-    // BISAYA ROAST MODE WITH METAPHORS - EXTRA ASAR
+    // BISAYA-TAGALOG SWATTER MODE
     $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
 
 **BISAYA-TAGALOG SWATTER MODE - WALANG TULONG:**
@@ -56,12 +58,23 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     ]);
 
     $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    echo $response;
+
+    // ⬇️ FIXED: Better error handling
+    if ($httpCode !== 200) {
+        error_log("Gemini API Error: $response");
+        return "Pasensya pre, may problema sa API. Quota limit ata o may error. Subukan ulit mamaya!";
+    }
+
     $data = json_decode($response, true);
-    echo  $data;
-    // ⬇️ FIXED: Added $ sign here
-    return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Pasensya, may error.';
+    
+    // ⬇️ FIXED: Check if data exists properly
+    if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+        return $data['candidates'][0]['content']['parts'][0]['text'];
+    }
+    
+    return 'Pasensya, may error sa response.';
 }
 
 // Call Gemini with the user's message
