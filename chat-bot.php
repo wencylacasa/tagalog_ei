@@ -11,7 +11,7 @@ function callGemini($prompt) {
     $apiKey = 'AIzaSyCNps-O9_4WRQ3OPFP9L_zgiW8urna221M'; // <-- your key
     
     // ⬇️ USING: Gemini 2.5 Flash (newest model)
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-001:generateContent?key=$apiKey";
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
 
     // BISAYA-TAGALOG SWATTER MODE
     $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
