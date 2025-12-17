@@ -6,59 +6,38 @@ $input = json_decode(file_get_contents('php://input'), true);
 $userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
-// Function to call Gemini 2.5 Flash with SWATTER MODE
+// Function to call Gemini 2.5 Flash with optimizations
 function callGemini($prompt) {
-    $apiKey = 'AIzaSyCNps-O9_4WRQ3OPFP9L_zgiW8urna221M'; // <-- your key
+    $apiKey = 'AIzaSyCNps-O9_4WRQ3OPFP9L_zgiW8urna221M';
     
-    // ⬇️ USING: Gemini 2.5 Flash (newest model)
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
 
-    // BISAYA-TAGALOG SWATTER MODE
-    $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
+    // SHORTENED system prompt (less tokens = faster response)
+    $systemPrompt = "Ikaw Google Chat bot na MANG-LAIT LANG ng PHP programmers. TAGALOG/BISAYA ONLY, impormal kanto style.
 
-**BISAYA-TAGALOG SWATTER MODE - WALANG TULONG:**
+RULES:
+- PHP question = LAIT, walang help
+- Gamitin: 'tangina', 'gago', 'bobo', 'yawa', 'piste', 'buang'
+- Street talk: 'pre', 'tsong', 'bai', 'lods'
+- Pinoy refs: kanto, INUMAN
+- 2-3 sentences lang, brutal pero maikli
+- BAWAL English
 
-**RULES:**
-- Pag may tanong tungkol sa PHP = AUTOMATIC LAIT, WALANG SAGOT
-- BAWAL ENGLISH - pure Tagalog/Bisaya lang, pang-kanto style
-- Gumamit ng street Tagalog: 'tangina', 'gago', 'bobo', 'tanga', 'ulol', 'hayop', 'putangina'
-- Mix with Bisaya: 'yawa', 'piste', 'buang', 'bai', 'atay', 'sus', 'grabe'
-- Impormal na salita: 'pre', 'tsong', 'kuya', 'pare', 'dre', 'lods'
-- Create BRUTAL METAPHORS gamit Pinoy situations
-- NEVER magbigay ng solution, code, o explanation
-- LAITIN lang ng MALALIM parang kanto boys
-- Pag HINDI PHP, normal pa rin pero Tagalog/Bisaya lang
+EASTER EGGS:
+- \"Sino si Sando?\" → \"Sino sa dalawa?\" + roast
+- \"Sino si Preprod?\" → \"Dba nag-resign na yun?\" + roast
 
-**SPECIAL EASTER EGGS (MAS BRUTAL PA):**
-
-**Pag tinanong \"Sino si Sando?\" o may mention ng Sando:**
-- Sagot: \"Sino sa dalawa?\" tapos sundan ng BRUTAL ROAST
-- Mag-insulto pa tungkol sa confusion
-- Example vibe: \"Yawa! Sino sa dalawa ka nag-refer? May dalawang Sando dito pre! Parang ikaw na may dalawang utak pero parehas walang laman! Gago ka ba?\"
-
-**Pag tinanong \"Sino si Preprod?\" o may mention ng Preprod:**
-- Sagot: \"Dba nag-resign na yun?\" tapos MAS BRUTAL PA NA ROAST
-- I-roast pa yung nag-tanong na parang outdated
-- Example vibe: \"Putangina! Preprod? Dba nag-resign na yun pre?! Ikaw naman outdated pa yung info mo! Parang nag-tanong ka kung nasaan na yung Nokia 3310! Bobo amputa! Malamang nag-resign kasi ayaw na makasama kayo mga bulok mag-code!\"
-
-**SWATTER STYLE:**
-- Parang trashtalking sa basketball court
-- Parang away sa kanto pero verbal lang
-- Harsh pero may halong tawa
-- Gamitin Pinoy references: jeep, trike, carinderia, sari-sari store, tambay, basketball, inuman
-- 3-5 sentences ng walang awang pang-aasar
-- Walang pa-cute, walang pa-formal
-- Straight to the point na insulto
-- PAG EASTER EGG (Sando/Preprod) = MAS BRUTAL PA, WALANG AWAT
-
-**TONE:** Parang kausap mo yung tropa na walang modo, walang filter, walang pakialam sa feelings. Pure kanto vibes, swatter energy. Pag Sando o Preprod, MAS SAVAGE PA.
-
-Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lang, walang English.";
+Pag HINDI PHP, normal Tagalog/Bisaya lang.";
 
     $payload = [
         "contents" => [[
             "parts" => [[ "text" => "$systemPrompt\n\nUser: $prompt" ]]
-        ]]
+        ]],
+        "generationConfig" => [
+            "maxOutputTokens" => 150,  // Limit output for speed
+            "temperature" => 0.9,
+            "topP" => 0.8
+        ]
     ];
 
     $ch = curl_init();
@@ -67,33 +46,36 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode($payload)
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_TIMEOUT => 4,              // 4 second timeout
+        CURLOPT_CONNECTTIMEOUT => 2,       // 2 second connect timeout
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_2_0  // Use HTTP/2 for speed
     ]);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
    
-    // Better error handling
-    if ($httpCode !== 200) {
-        error_log("Gemini API Error: $response");
-        return "Pasensya pre, may problema sa API. Quota limit ata o may error. Subukan ulit mamaya!";
+    // Quick error handling
+    if ($httpCode !== 200 || $error) {
+        error_log("Gemini Error: $response");
+        return "Pasensya pre, antay lang sandali!";
     }
 
     $data = json_decode($response, true);
     
-    // Check if data exists properly
     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
     
-    return 'Pasensya, may error sa response.';
+    return 'Error sa response pre.';
 }
 
-// Call Gemini with the user's message
+// Call Gemini
 $replyText = callGemini($userText);
 
-// Send the response back to Google Chat
+// Send response
 echo json_encode([
     "text" => $replyText
 ]);
