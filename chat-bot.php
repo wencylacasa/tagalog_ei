@@ -1,17 +1,50 @@
 <?php
 header('Content-Type: application/json');
 
-// Read incoming Google Chat message
-$input = json_decode(file_get_contents('php://input'), true);
-$userText = $input['message']['text'] ?? '';
-$senderName = $input['message']['sender']['displayName'] ?? 'User';
+// Read raw input
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
 
-// Gemini call function (your existing code)
+// Debug: Log what we receive (remove in production)
+// error_log("Raw input: " . $rawInput);
+
+// Handle different Google Chat formats
+$userText = '';
+$senderName = 'User';
+
+// Try different possible structures
+if (isset($input['message']['text'])) {
+    // Direct webhook format
+    $userText = $input['message']['text'];
+    $senderName = $input['message']['sender']['displayName'] ?? 'User';
+} elseif (isset($input['text'])) {
+    // Simplified format
+    $userText = $input['text'];
+    $senderName = $input['sender']['displayName'] ?? 'User';
+} elseif (isset($input['message']['argumentText'])) {
+    // Slash command format
+    $userText = $input['message']['argumentText'];
+    $senderName = $input['message']['sender']['displayName'] ?? 'User';
+} elseif (isset($input['type']) && $input['type'] === 'MESSAGE') {
+    // Apps Script format with type field
+    $userText = $input['message']['text'] ?? $input['message']['argumentText'] ?? '';
+    $senderName = $input['user']['displayName'] ?? 'User';
+}
+
+// Fallback: if still empty, return error response
+if (empty($userText)) {
+    echo json_encode([
+        "text" => "Tangina pre, walang makita akong message! Ano ba sinend mo? Debug info: " . substr($rawInput, 0, 200)
+    ]);
+    exit;
+}
+
+// Gemini call function
 function callGemini($prompt) {
     $apiKey = 'AIzaSyD1FdvgKgtPsq6xSSApKTfiaWJsCgY4KVY';
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
 
- $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
+    $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
 
 **BISAYA-TAGALOG SWATTER MODE - WALANG TULONG:**
 
@@ -64,7 +97,8 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS => json_encode($payload)
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_TIMEOUT => 30
     ]);
 
     $response = curl_exec($ch);
@@ -72,9 +106,8 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     curl_close($ch);
    
     if ($httpCode !== 200) {
-        return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
+        return "Pasensya pre, may problema sa API (HTTP $httpCode). Subukan ulit mamaya!";
     }
-
    
     $data = json_decode($response, true);
     
@@ -82,14 +115,16 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
 
-    return 'Pasensya, may error sa response.';
+    return 'Pasensya, may error sa response. Check kung may safety filter.';
 }
 
 // Call Gemini
 $replyText = callGemini($userText);
 
-// Wrap response for Google Chat 2nd-gen (Cloud Functions)
+// Return response in multiple formats for compatibility
 $response = [
+    "text" => $replyText,
+    // Also include the Cloud Functions format
     "hostAppDataAction" => [
         "chatDataAction" => [
             "createMessageAction" => [
@@ -101,5 +136,5 @@ $response = [
     ]
 ];
 
-// Send JSON back
 echo json_encode($response);
+?>
