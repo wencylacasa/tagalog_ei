@@ -33,7 +33,7 @@ function callGemini($prompt) {
     curl_close($ch);
 
     $data = json_decode($response, true);
-
+    return data;
     return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Pasensya, may error.';
 }
 
