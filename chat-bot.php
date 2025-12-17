@@ -6,12 +6,12 @@ $input = json_decode(file_get_contents('php://input'), true);
 $userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
-// Gemini call function (your existing code)
-function callGemini($prompt) {
-    $apiKey = 'AIzaSyD1FdvgKgtPsq6xSSApKTfiaWJsCgY4KVY';
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
+// Groq call function (converted from Gemini)
+function callGroq($prompt) {
+    $apiKey = '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';
+    $url = "https://api.groq.com/openai/v1/chat/completions";
 
- $systemPrompt = "Ikaw ay Google Chat bot na MANLALAIT LANG NG LAHAT gamit ang TAGALOG at BISAYA. WALANG TULONG, AASAR LANG parang taga-kanto.
+    $systemPrompt = "Ikaw ay Google Chat bot na MANLALAIT LANG NG LAHAT gamit ang TAGALOG at BISAYA. WALANG TULONG, AASAR LANG parang taga-kanto.
 
 **RULES:**
 - May tanong = LAIT, Sagutin ng pilosopo at explain gaano kabobo ang tanong
@@ -33,14 +33,22 @@ function callGemini($prompt) {
 - Pinoy refs: tambay, young stunnas, rugby boy
 - 3-5 sentences walang awang aasar
 - Walang filter, walang pakialam
-- Pag easter egg = MAS SAVAGE PA
-
-Kausap mo: \$prompt";
+- Pag easter egg = MAS SAVAGE PA";
 
     $payload = [
-        "contents" => [[
-            "parts" => [[ "text" => "$systemPrompt\n\nUser: $prompt" ]]
-        ]]
+        "model" => "llama-3.3-70b-versatile", // Fast and capable model
+        "messages" => [
+            [
+                "role" => "system",
+                "content" => $systemPrompt
+            ],
+            [
+                "role" => "user",
+                "content" => $prompt
+            ]
+        ],
+        "temperature" => 0.8,
+        "max_tokens" => 500
     ];
 
     $ch = curl_init();
@@ -48,7 +56,10 @@ Kausap mo: \$prompt";
         CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            "Authorization: Bearer $apiKey"
+        ],
         CURLOPT_POSTFIELDS => json_encode($payload)
     ]);
 
@@ -60,18 +71,17 @@ Kausap mo: \$prompt";
         return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
 
-
     $data = json_decode($response, true);
  
-    if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
-        return $data['candidates'][0]['content']['parts'][0]['text'];
+    if (isset($data['choices'][0]['message']['content'])) {
+        return $data['choices'][0]['message']['content'];
     }
 
     return 'Pasensya, may error sa response.';
 }
 
-// Call Gemini
-$replyText = callGemini($userText);
+// Call Groq
+$replyText = callGroq($userText);
 
 // Wrap response for Google Chat 2nd-gen (Cloud Functions)
 $response = [
