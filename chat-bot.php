@@ -8,7 +8,7 @@ $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
 // Gemini call function (your existing code)
 function callGemini($prompt) {
-    $apiKey = 'AIzaSyD1FdvgKgtPsq6xSSApKTfiaWJsCgY4KVY';
+    $apiKey = 'AIzaSyAn-p98Eny0gm65iex1dhHG9bAjPdlZEQY';
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
 
  $systemPrompt = "Ikaw ay Google Chat bot na MANLALAIT LANG NG LAHAT gamit ang TAGALOG at BISAYA. WALANG TULONG, AASAR LANG parang taga-kanto.
