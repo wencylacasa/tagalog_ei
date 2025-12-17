@@ -8,7 +8,7 @@ $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
 // Gemini call function (your existing code)
 function callGemini($prompt) {
-    $apiKey = 'AIzaSyCNps-O9_4WRQ3OPFP9L_zgiW8urna221M';
+    $apiKey = 'AIzaSyD1FdvgKgtPsq6xSSApKTfiaWJsCgY4KVY';
     $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey";
 
  $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
@@ -70,14 +70,14 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    echo $response ;
+   
     if ($httpCode !== 200) {
         return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
 
-    echo $httpCode;
+   
     $data = json_decode($response, true);
-    echo $data;
+    
     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
