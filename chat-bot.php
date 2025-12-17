@@ -60,9 +60,23 @@ switch ($eventType) {
 
 // Validate we got a message
 if (empty($userText)) {
-    echo json_encode([
-        "text" => "Test no input"
-    ]);
+   
+    // Return response in multiple formats for compatibility
+    $response1 = [
+        "text" => $rawInput,
+        // Also include the Cloud Functions format
+        "hostAppDataAction" => [
+            "chatDataAction" => [
+                "createMessageAction" => [
+                    "message" => [
+                        "text" => $rawInput
+                    ]
+                ]
+            ]
+        ]
+    ];
+
+    echo json_encode($response1);
     exit;
 }
 
