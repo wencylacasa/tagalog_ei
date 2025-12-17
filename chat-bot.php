@@ -1,10 +1,37 @@
 <?php
+// CRITICAL: Must respond within 30 seconds or Google Chat times out
 header('Content-Type: application/json');
 
+// Enable error logging for debugging
+ini_set('display_errors', 0);
+error_log("=== Google Chat Request Received ===");
+
 // Read the incoming Google Chat message
-$input = json_decode(file_get_contents('php://input'), true);
+$rawInput = file_get_contents('php://input');
+error_log("Raw Input: " . $rawInput);
+
+$input = json_decode($rawInput, true);
+
+// Handle VERIFICATION request from Google Chat
+if (isset($input['type']) && $input['type'] === 'ADDED_TO_SPACE') {
+    error_log("Bot added to space");
+    echo json_encode([
+        "text" => "Ano pre? Nandito na ako! PHP programmer ka ba? 😏"
+    ]);
+    exit;
+}
+
+// Handle REMOVED event
+if (isset($input['type']) && $input['type'] === 'REMOVED_FROM_SPACE') {
+    error_log("Bot removed from space");
+    exit;
+}
+
+// Extract message text
 $userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
+
+error_log("User: $senderName | Message: $userText");
 
 // Function to call Gemini 2.5 Flash with optimizations
 function callGemini($prompt) {
@@ -19,7 +46,7 @@ RULES:
 - PHP question = LAIT, walang help
 - Gamitin: 'tangina', 'gago', 'bobo', 'yawa', 'piste', 'buang'
 - Street talk: 'pre', 'tsong', 'bai', 'lods'
-- Pinoy refs: kanto, INUMAN
+- Pinoy refs: jeep, trike, kanto, basketball
 - 2-3 sentences lang, brutal pero maikli
 - BAWAL English
 
@@ -75,7 +102,12 @@ Pag HINDI PHP, normal Tagalog/Bisaya lang.";
 // Call Gemini
 $replyText = callGemini($userText);
 
+error_log("Response: " . $replyText);
+
 // Send response
 echo json_encode([
     "text" => $replyText
 ]);
+
+// Make sure no extra output
+exit;
