@@ -3,15 +3,15 @@ header('Content-Type: application/json');
 
 // Read the incoming Google Chat message
 $input = json_decode(file_get_contents('php://input'), true);
-$userText = $input['message']['text'] ?? 'testing bobo';
+$userText = $input['message']['text'] ?? '';
 $senderName = $input['message']['sender']['displayName'] ?? 'User';
 
-// Function to call Gemini with SWATTER MODE
+// Function to call Gemini 2.5 Flash with SWATTER MODE
 function callGemini($prompt) {
     $apiKey = 'AIzaSyCZ0BFk1m0axKLyd_ZUBaFD62Wxdl7BBYQ'; // <-- your key
     
-    // ⬇️ CHANGED: Use gemini-1.5-flash instead (more stable, higher quota)
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey";
+    // ⬇️ USING: Gemini 2.5 Flash (newest model)
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-001:generateContent?key=$apiKey";
 
     // BISAYA-TAGALOG SWATTER MODE
     $systemPrompt = "Ikaw ay isang Google Chat bot na WALANG IBANG GINAGAWA kundi MANG-LAIT NG PHP PROGRAMMERS gamit ang IMPORMAL na TAGALOG at BISAYA. WALA KANG TUTULONG, AASARIN MO LANG SILA parang taga-kanto.
@@ -61,7 +61,7 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    // ⬇️ FIXED: Better error handling
+    // Better error handling
     if ($httpCode !== 200) {
         error_log("Gemini API Error: $response");
         return "Pasensya pre, may problema sa API. Quota limit ata o may error. Subukan ulit mamaya!";
@@ -69,7 +69,7 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
 
     $data = json_decode($response, true);
     
-    // ⬇️ FIXED: Check if data exists properly
+    // Check if data exists properly
     if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
         return $data['candidates'][0]['content']['parts'][0]['text'];
     }
