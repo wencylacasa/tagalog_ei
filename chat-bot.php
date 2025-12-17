@@ -73,6 +73,7 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
 
     if ($httpCode !== 200) {
         error_log("Gemini API Error: $response");
+        return $response;
         return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
 
