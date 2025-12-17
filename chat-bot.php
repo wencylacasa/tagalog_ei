@@ -57,8 +57,9 @@ Kung HINDI tungkol sa PHP, magsalita ka pa rin ng normal pero Tagalog/Bisaya lan
 
     $response = curl_exec($ch);
     curl_close($ch);
-
+    echo $response;
     $data = json_decode($response, true);
+    echo  $data;
     // ⬇️ FIXED: Added $ sign here
     return $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Pasensya, may error.';
 }
