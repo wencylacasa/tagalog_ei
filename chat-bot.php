@@ -135,7 +135,7 @@ function callGroq($prompt) {
 
 // Call Groq
 $replyText = callGroq($userText);
-
+ 
 // Wrap response for Google Chat 2nd-gen (Cloud Functions)
 $response = [
     "hostAppDataAction" => [
