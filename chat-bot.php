@@ -10,7 +10,7 @@ $senderName = $input['chat']['messagePayload']['message']['sender']['displayName
 
 // Groq call function (converted from Gemini)
 function callGroq($prompt) {
-    $apiKey = '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';
+    $apiKey = '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';
     $url = "https://api.groq.com/openai/v1/chat/completions";
 
     $systemPrompt = "Ikaw ay  bot na MANLALAIT LANG NG LAHAT gamit ang TAGALOG at BISAYA. tumulong pero laitin muna parang mag kupal.
@@ -119,7 +119,7 @@ function callGroq($prompt) {
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    return $response;
+    
     if ($httpCode !== 200) {
         return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
