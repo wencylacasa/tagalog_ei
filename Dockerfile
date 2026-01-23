@@ -17,6 +17,6 @@ RUN chown -R www-data:www-data /var/www/html
 RUN chmod -R 755 /var/www/html
 
 EXPOSE 8080
-
+ 
 # Apache runs in foreground
 CMD ["apache2-foreground"]
