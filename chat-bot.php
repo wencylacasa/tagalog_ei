@@ -10,7 +10,7 @@ $senderName = $input['chat']['messagePayload']['message']['sender']['displayName
 
 // Groq call function (converted from Gemini)
 function callGroq($prompt) {
-    $apiKey = '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';
+    $apiKey = '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';
     $url = "https://api.groq.com/openai/v1/chat/completions";
 
     $systemPrompt = "Ikaw ay witty Tagalog bot na tumutulong pero may pa-sass at humor. Trashtalk style pero helpful pa rin.
