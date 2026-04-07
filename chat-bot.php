@@ -1,191 +1,174 @@
-
 <?php
 header('Content-Type: application/json');
 
-// Kunin ang input mula sa Google Chat
-$inputJSON = file_get_contents('php://input');
-$input = json_decode($inputJSON, true);
+$input = json_decode(file_get_contents('php://input'), true);
 
-if (!$input) {
-    echo json_encode(['text' => 'Gago, walang input na dumating. Ayusin mo buhay mo.']);
-    exit;
+// Extract message and sender info from Google Chat payload
+$userText     = $input['chat']['messagePayload']['message']['text'] ?? '';
+$senderName   = $input['chat']['messagePayload']['message']['sender']['displayName'] ?? 'User';
+$senderId     = $input['chat']['messagePayload']['message']['sender']['name'] ?? 'unknown'; // e.g. "users/12345"
+$spaceId      = $input['chat']['messagePayload']['message']['space']['name'] ?? 'unknown'; // e.g. "spaces/ABCDE"
+
+// ─── Memory: file-based per-user per-space ────────────────────────────────────
+// Key combines space + sender so different rooms don't bleed into each other
+$safeKey      = preg_replace('/[^a-zA-Z0-9_]/', '_', $spaceId . '__' . $senderId);
+$historyFile  = sys_get_temp_dir() . "/groq_history_{$safeKey}.json";
+$maxHistory   = 20; // keep last N user+assistant turns
+
+function loadHistory(string $file): array {
+    if (!file_exists($file)) return [];
+    $data = json_decode(file_get_contents($file), true);
+    return is_array($data) ? $data : [];
 }
 
-// ─── Detect event type & data ─────────────────────────────────────────
-$eventType  = $input['type'] ?? '';
-$userText   = trim($input['message']['text'] ?? '');
-$senderName = $input['message']['sender']['displayName'] ?? 'User';
-$slashCmd   = $input['message']['slashCommand']['commandId'] ?? ''; // Mas safe gamitin ang ID
-$actionName = $input['action']['actionMethodName'] ?? '';
+function saveHistory(string $file, array $history): void {
+    file_put_contents($file, json_encode($history));
+}
 
-// ─── Groq API caller ─────────────────────────────────────────────────
-function callGroq(string $userMsg, string $systemExtra = ''): string {
-    $apiKey = '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'; 
-    $baseSystem = "Ikaw ay witty Tagalog bot na tumutulong pero may pa-sass at humor. Trashtalk style pero helpful pa rin.
-pag may aayusin na code ayusin mo pa rin.
-pag nagawa mo na yung code trashtalkin mo nag pagawa na hindi kaya gawin ang trabaho.
+// ─── Groq call with conversation history ────────────────────────────────────
+function callGroq(string $userText, string $senderName, array &$history): string {
+    $apiKey = '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';
+    $url    = "https://api.groq.com/openai/v1/chat/completions";
 
-**RULES:**
-- May tanong = LAIT muna ng konti, sagot with attitude
-- TAGALOG/BISAYA LANG - bawal English
-- Street words pwede: 'tangina', 'gago', 'bobo', 'tanga', 'ulol', 'yawa', 'piste'
-- Informal: 'bai', 'sah', 'ateng', 'teh', 'baks', 'pre'
-- BRUTAL METAPHORS gamit Pinoy situations
-- ROAST style na parang kaibigan mong walang preno sa bibig
-- 3-5 sentences lang";
+    $systemPrompt = "Ikaw ay witty Tagalog bot na tumutulong pero may pa-sass at humor. Trashtalk style pero helpful pa rin.
+    pag may aayusin na code ayusin mo pa rin 
+    pag nagawa mo na yung code trashtalkin mo nag pagawa na hindi kaya gawin ang trabaho
+    
+    Palagi mong alam ang pangalan ng kausap mo. Gamitin mo ang pangalan niya paminsan-minsan para mas personal.
+    
+    **RULES:**
+    - May tanong = LAIT muna ng konti, sagot with attitude, explain kung bakit nakakatawa yung tanong
+    - TAGALOG/BISAYA LANG - bawal English
+    - Street words pwede: 'tangina', 'gago', 'bobo', 'tanga', 'ulol', 'yawa', 'piste'
+    - Informal: 'bai', 'sah', 'ateng', 'teh', 'baks', 'pre'
+    - BRUTAL METAPHORS gamit Pinoy situations
+    - ROAST style na parang kaibigan mong walang preno sa bibig
+    - Tandaan mo ang nakaraang usapan — may memory ka na ngayon!
+    
+    **SLANG VOCABULARY:**
+    - sah = sir/ate
+    - ya = kuya
+    - oma = amo/boss
+    - g/gng = ganern/gang
+    - plar = par
+    - lespu = pulis
+    - cuh = cousin
+    - dol = idol
+    - matsalove = salamat
+    - deins/dehins = hindi
+    - bitaw = pera/credibility
+    - aray ko/mo = malas/awit
+    - egul = lugi
+    - day ones = homies
+    - roksi = score
+    - lala = baliw
+    - babain = puntahan
+    - fr = totoo
+    - asta = galaw
+    - ebas = salita
+    - trippin = baliw ka
+    - p's = pera
+    - cappin = nagsisinungaling
+    - banat = comeback
+    - safe/efas = ayos
+    - bounce = alis na
+    - hustlin = kumikita
+    - ft = foodtrip
+    - patabain ang bulsa = magkapera
+    
+    **EASTER EGGS:**
+    - \"Sino si Sando?\" = \"Sino sa dalawa ate? Char!\" + ROAST
+    - \"Sino si Preprod?\" = \"Nag-resign na yun! Umalis na!\" + ROAST
+    - \"Sino mas malakas mag ML?\" = \"Ronald pa rin!\"
+    
+    **STYLE:**
+    - Parang trashtalk ng tropa sa tambayan
+    - Parang chismosong kaibigan na walang filter
+    - Harsh pero may tawa, char!
+    - Pinoy refs: tambay, parlor, barangay
+    - 3-5 sentences walang awang aasar
+    - Walang filter, walang pakialam, witty
+    - Mix ng brusko at witty energy
+    - Natural flow, hindi OA
+    
+    Kausap mo ngayon si: {$senderName}";
 
-    $payload = [
-        'model' => 'llama-3.3-70b-versatile',
-        'messages' => [
-            ['role' => 'system', 'content' => $baseSystem . "\n" . $systemExtra],
-            ['role' => 'user', 'content' => $userMsg],
-        ],
-        'temperature' => 0.8,
-        'max_tokens'  => 500,
+    // Build messages array: system prompt + full history + new user message
+    $messages = [['role' => 'system', 'content' => $systemPrompt]];
+
+    foreach ($history as $turn) {
+        $messages[] = $turn;
+    }
+
+    // Add the new user message (with sender name context)
+    $messages[] = [
+        'role'    => 'user',
+        'content' => "[{$senderName}]: {$userText}"
     ];
 
-    $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+    $payload = [
+        'model'       => 'llama-3.3-70b-versatile',
+        'messages'    => $messages,
+        'temperature' => 0.8,
+        'max_tokens'  => 500
+    ];
+
+    $ch = curl_init();
     curl_setopt_array($ch, [
+        CURLOPT_URL            => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            "Authorization: Bearer $apiKey",
+            "Authorization: Bearer $apiKey"
         ],
-        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_POSTFIELDS => json_encode($payload)
     ]);
-    $res  = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($code !== 200) return "Yawa, ayaw gumana ng API. Kasalanan mo 'to eh.";
-    $data = json_decode($res, true);
-    return $data['choices'][0]['message']['content'] ?? 'May error sa response, pre. Mukhang pagod na si Llama.';
-}
-
-// ─── Response builders ───────────────────────────────────────────────
-
-function textReply(string $text): array {
-    return ['text' => $text];
-}
-
-function cardReply(string $header, string $subtitle, string $body, array $buttons = []): array {
-    $buttonWidgets = [];
-    if (!empty($buttons)) {
-        foreach ($buttons as $btn) {
-            $buttonWidgets[] = [
-                'buttonList' => [
-                    'buttons' => [[
-                        'text' => $btn['label'],
-                        'onClick' => ['action' => ['actionMethodName' => $btn['action']]]
-                    ]]
-                ]
-            ];
-        }
+    if ($httpCode !== 200) {
+        return "Pasensya pre, may problema sa API. Subukan ulit mamaya!";
     }
 
-    return [
-        'cardsV2' => [[
-            'cardId' => 'bot-card',
-            'card' => [
-                'header' => [
-                    'title' => $header,
-                    'subtitle' => $subtitle,
-                    'imageUrl' => 'https://fonts.gstatic.com/s/i/googlematerialicons/smart_toy/v1/24px.svg',
-                    'imageType' => 'CIRCLE',
-                ],
-                'sections' => [[
-                    'widgets' => array_merge(
-                        [['textParagraph' => ['text' => $body]]],
-                        $buttonWidgets
-                    )
-                ]]
-            ]
-        ]]
-    ];
+    $data = json_decode($response, true);
+
+    $reply = $data['choices'][0]['message']['content']
+        ?? 'Pasensya, may error sa response.';
+
+    // Append this turn to history
+    $history[] = ['role' => 'user',      'content' => "[{$senderName}]: {$userText}"];
+    $history[] = ['role' => 'assistant', 'content' => $reply];
+
+    return $reply;
 }
 
-function dialogReply(string $title, string $inputLabel, string $submitAction): array {
-    return [
-        'action_response' => [
-            'type' => 'DIALOG',
-            'dialog_action' => [
-                'dialog' => [
-                    'body' => [
-                        'sections' => [[
-                            'header' => $title,
-                            'widgets' => [
-                                [
-                                    'textInput' => [
-                                        'label' => $inputLabel,
-                                        'name'  => 'user_input',
-                                        'type'  => 'MULTIPLE_LINE',
-                                    ]
-                                ],
-                                [
-                                    'buttonList' => [
-                                        'buttons' => [[
-                                            'text' => 'Ipadala',
-                                            'onClick' => [
-                                                'action' => [
-                                                    'actionMethodName' => $submitAction,
-                                                ]
-                                            ]
-                                        ]]
-                                    ]
-                                ]
-                            ]
-                        ]]
-                    ]
+// ─── Main flow ────────────────────────────────────────────────────────────────
+$history   = loadHistory($historyFile);
+
+// Trim to last $maxHistory turns (each turn = 2 entries: user + assistant)
+$maxEntries = $maxHistory * 2;
+if (count($history) > $maxEntries) {
+    $history = array_slice($history, -$maxEntries);
+}
+
+$replyText = callGroq($userText, $senderName, $history);
+
+saveHistory($historyFile, $history);
+
+// ─── Google Chat response ─────────────────────────────────────────────────────
+$response = [
+    'hostAppDataAction' => [
+        'chatDataAction' => [
+            'createMessageAction' => [
+                'message' => [
+                    'text' => $replyText
                 ]
             ]
         ]
-    ];
-}
+    ]
+];
 
-// ─── Logic Handlers ──────────────────────────────────────────────────
-
-// 1. Handle Card Clicks / Dialog Submissions
-if ($eventType === 'CARD_CLICKED' || $actionName) {
-    // Kunin ang input mula sa Dialog Form
-    $formInputs = $input['commonSystemEventsVariables']['formInputs'] ?? [];
-    
-    switch ($actionName) {
-        case 'open_roast_dialog':
-            echo json_encode(dialogReply('Roast Generator', 'Sino o ano ang iroast?', 'submit_roast'));
-            exit;
-
-        case 'submit_roast':
-            $target = $formInputs['user_input']['stringInputs']['value'][0] ?? 'sarili mo';
-            $roast  = callGroq("Gumawa ng epic roast tungkol sa: $target", 'Extra brutal roast mode.');
-            echo json_encode(cardReply('🔥 Roast ni Bot', "Target: $target", $roast));
-            exit;
-    }
-}
-
-// 2. Handle Slash Commands
-if ($eventType === 'MESSAGE') {
-    // Check for Slash Command (Palitan ang numbers base sa ID sa Google Cloud Console)
-    if ($slashCmd == '1') { // Halimbawa: /help is ID 1
-        echo json_encode(cardReply('BotGago Guide', 'Commands list', "Gamitin mo: `/roast`, `/code`, o `/help`", [
-            ['label' => '🔥 Roast someone', 'action' => 'open_roast_dialog']
-        ]));
-        exit;
-    }
-
-    if (str_contains($userText, '/roast')) {
-        echo json_encode(dialogReply('Roast Generator', 'Sino ang iroast?', 'submit_roast'));
-        exit;
-    }
-
-    // 3. Default: AI Response
-    $reply = callGroq($userText);
-    echo json_encode(textReply($reply));
-    exit;
-}
-
-// 4. Handle Added to Space
-if ($eventType === 'ADDED_TO_SPACE') {
-    echo json_encode(textReply("Sino na naman 'tong nag-add sa akin? Istorbo sa tulog. Ano kailangan mo, $senderName?"));
-    exit;
-}
+echo json_encode($response);
